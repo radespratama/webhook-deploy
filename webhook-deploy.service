@@ -1,0 +1,28 @@
+[Unit]
+Description=GitHub webhook -> deploy listener
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/home/deploy/webhook-deploy
+ExecStart=/home/deploy/webhook-deploy/webhook-deploy-bin
+Restart=on-failure
+RestartSec=5
+
+# Env vars (alternative to editing here: use EnvironmentFile=/etc/webhook-deploy.env)
+Environment=PORT=9000
+Environment=GITHUB_WEBHOOK_SECRET=change-me-to-a-long-random-string
+Environment=ALLOWED_BRANCH=refs/heads/main
+Environment=DEPLOY_SCRIPT_PATH=/home/deploy/webhook-deploy/deploy.sh
+Environment=DEPLOY_HISTORY_PATH=/home/deploy/webhook-deploy/deploy_history.json
+Environment=DISCORD_WEBHOOK_URL=
+Environment=ERROR_LOG_DIR=/home/deploy/webhook-deploy/logs
+# comma-separated project slugs; per-project env: <SLUG>_WEBHOOK_SECRET, <SLUG>_DEPLOY_SCRIPT, <SLUG>_ALLOWED_BRANCH
+Environment=PROJECTS=apps
+Environment=PV_WEBHOOK_SECRET=change-me
+#Environment=PV_DEPLOY_SCRIPT=/home/deploy/webhook-deploy/deploys/app.deploy.sh
+#Environment=PV_ALLOWED_BRANCH=refs/heads/main
+
+[Install]
+WantedBy=multi-user.target
