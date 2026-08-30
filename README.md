@@ -106,10 +106,23 @@ sudo visudo -f /etc/sudoers.d/webhook-deploy
 deploy ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart your-app
 ```
 
-### 3. Set environment variables
+### 3. Configure `.env`
 
-Edit them directly in `webhook-deploy.service` (the `Environment=` lines) — see
-[Configuration](#configuration) for the full list — then:
+`.env` is the single source of truth — both `webhook-deploy.service` (systemd,
+via `EnvironmentFile=`) and `webhook-deploy.conf` (supervisor, via a shell
+wrapper that sources it) read the same file. The app itself only reads
+environment variables; the init system injects them.
+
+```bash
+cp .env.example .env
+chmod 600 .env   # contains webhook secrets
+# edit .env — see Configuration below; replace /<path_project>/ placeholders
+```
+
+**Important**: every `<SLUG>_WEBHOOK_SECRET` must be a long random string, not a
+guessable password — generate one with `openssl rand -hex 32`.
+
+Then start with systemd:
 
 ```bash
 sudo cp webhook-deploy.service /etc/systemd/system/
@@ -118,8 +131,16 @@ sudo systemctl enable --now webhook-deploy
 sudo systemctl status webhook-deploy
 ```
 
-**Important**: every `<SLUG>_WEBHOOK_SECRET` must be a long random string, not a
-guessable password — generate one with `openssl rand -hex 32`.
+or supervisor:
+
+```bash
+sudo cp webhook-deploy.conf /etc/supervisor/conf.d/
+sudo supervisorctl reread && sudo supervisorctl update
+sudo supervisorctl status webhook-deploy
+```
+
+Note: `PROJECTS` and its `<SLUG>_` prefix must match — `PROJECTS=random-project`
+expects `RANDOM_PROJECT_WEBHOOK_SECRET`, not `APP_WEBHOOK_SECRET`.
 
 ### 4. Expose it to the internet
 
@@ -147,7 +168,7 @@ GitHub sends a `ping` event right away — the server replies
 | Env var                 | Required        | Default                      | Purpose                                             |
 | ----------------------- | --------------- | ---------------------------- | --------------------------------------------------- |
 | `PORT`                  | -               | `9000`                       | HTTP server port                                    |
-| `PROJECTS`              | ✓               | `kuroneko`                   | Comma-separated project slugs, e.g. `PROJECTS=api,web` |
+| `PROJECTS`              | ✓               | - (must be set)              | Comma-separated project slugs, e.g. `PROJECTS=api,web` |
 | `<SLUG>_WEBHOOK_SECRET` | ✓ (per project) | -                            | HMAC secret used to verify the GitHub signature     |
 | `<SLUG>_DEPLOY_SCRIPT`  | -               | `./deploys/<slug>.deploy.sh` | Path to that project's deploy script                |
 | `<SLUG>_ALLOWED_BRANCH` | -               | `refs/heads/main`            | Branch that triggers a deploy                       |
@@ -199,6 +220,7 @@ curl http://localhost:9000/deploys
 - **Notifier kept out of the deploy logic**: `notifier.Discord` and
   `notifier.AppendError` are plain functions, not interfaces — called directly
   from `deployService`, no abstraction needed beyond that.
-- **No `.env` library**: Fiber and uuid are the only external dependencies. The
-  systemd unit sets the environment variables, following normal Linux service
-  convention.
+- **No `.env` library**: Fiber and uuid are the only external dependencies.
+  Config lives in one `.env` file, loaded by the init system (systemd
+  `EnvironmentFile=` or a supervisor shell wrapper) — following normal Linux
+  service convention.

@@ -24,7 +24,7 @@ func Load() (*Config, error) {
 		ErrorLogDir:       getEnv("ERROR_LOG_DIR", "./logs"),
 	}
 
-	for _, raw := range strings.Split(getEnv("PROJECTS", "kuroneko"), ",") {
+	for _, raw := range strings.Split(os.Getenv("PROJECTS"), ",") {
 		name := strings.ToLower(strings.TrimSpace(raw))
 		if name == "" {
 			continue
